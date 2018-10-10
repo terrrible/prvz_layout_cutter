@@ -154,6 +154,19 @@ def alChopEmAll(prefix, progressControl, checkBoxOpt):
 # Kill all jobs
 	cmds.scriptJob(ka=True)
 
+	print 'START DEBUG'
+	opt_sh0000 = cmds.checkBoxGrp(checkBoxOpt, q=1, value1=1)
+	opt_id = cmds.checkBoxGrp(checkBoxOpt, q=1, value2=1)
+	if opt_sh0000:
+		opt_sh0000 = 'sh0000'
+	else:
+		opt_sh0000 = ' '
+	if opt_id:
+		opt_id = 'id'
+	else:
+		opt_id = ' '
+	print opt_sh0000, opt_id
+
 # Get filename and path
 	#fileName = cmds.file(q=1, expandName=1)
 	#path, separator, filename = fileName.rpartition("/")
