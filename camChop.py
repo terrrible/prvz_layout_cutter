@@ -45,7 +45,6 @@ def alShotChopOn():
 
 	if cmds.window('CHOPOUTWIN', exists=True) == True:
 		cmds.deleteUI('CHOPOUTWIN')
-
 	window = cmds.window('CHOPOUTWIN', title="animania Shot Choppa")
 	cmds.columnLayout()
 
@@ -61,49 +60,77 @@ def alShotChopOn():
 
 	cmds.text( label='Step 3: cut 3D animatic' )
 	cmds.separator()
-	checkBoxOpt = cmds.checkBoxGrp(numberOfCheckBoxes=2, label='Cut Options:    ', labelArray2=['Include sh0001', 'Include ID shots'])
+	#checkBoxOpt = cmds.checkBoxGrp(numberOfCheckBoxes=2, label='Cut Options:    ', labelArray2=['Include sh0001', 'Include ID shots'])
+	cmds.checkBoxGrp('serv_shots_grp',numberOfCheckBoxes=2, label='Cut Options:    ', labelArray2=['Include sh0001', 'Include ID shots'])
 
 	progressControl = cmds.progressBar(width=600, visible=False)
 	cmds.scrollField('LOC', editable=True, wordWrap=False, w=600, h=60, text=get_loc())
 	#cmds.textFieldButtonGrp('NAMEFIELD', text="cutscene", bc=lambda *args: alRunChop(), buttonLabel="Chop On!",
 						  #label="Cut Scenes Name Prefix:")
-	cmds.textFieldButtonGrp('NAMEFIELD', text="cutscene", bc=lambda *args: alRunChop(progressControl, checkBoxOpt), buttonLabel="CUT",
+	cmds.textFieldButtonGrp('NAMEFIELD', text="cutscene", bc=lambda *args: alRunChop(progressControl), buttonLabel="CUT",
 						  label="Cut Scenes Name Prefix:")
 	cmds.text( label='Exclude List' )
 	cmds.scrollField('EX', editable=True, wordWrap=False, w=250, h=250, text='chars\nlocs\nloc')
 
-	cmds.button( label='DEBUG', command=lambda *args: debug(checkBoxOpt))
+	cmds.button( label='DEBUG', command=lambda *args: debug(args))
 	cmds.showWindow(window)
 
-def debug(checkBoxOpt):
+def debug(args):
 	print 'START DEBUG'
-	opt_sh0000 = cmds.checkBoxGrp(checkBoxOpt, q=1, value1=1)
-	opt_id = cmds.checkBoxGrp(checkBoxOpt, q=1, value2=1)
-	if opt_sh0000:
-		opt_sh0000 = 'sh0000'
+	opt_sh0001 = cmds.checkBoxGrp('serv_shots_grp', q=1, value1=1)
+	opt_id = cmds.checkBoxGrp('serv_shots_grp', q=1, value2=1)
+	if opt_sh0001:
+		opt_sh0001 = '0001'
 	else:
-		opt_sh0000 = ''
+		opt_sh0001 = ''
 	if opt_id:
 		opt_id = 'id'
 	else:
 		opt_id = ''
-	print opt_sh0000, opt_id
+	print opt_sh0001, opt_id
 
-def set_step1(args):
+def service_shots_status():
+	print 'START service_shots_status'
+	opt_sh0001 = cmds.checkBoxGrp('serv_shots_grp', q=1, value1=1)
+	opt_id = cmds.checkBoxGrp('serv_shots_grp', q=1, value2=1)
+	if not opt_sh0001:
+		opt_sh0001 = '0001'
+	else:
+		opt_sh0001 = ' '
+	if not opt_id:
+		opt_id = 'id'
+	else:
+		opt_id = ' '
+	return [opt_sh0001, opt_id]
+
+def set_step1(checkBoxOpt):
+	exclude_shots = service_shots_status()
+
 #remove imageplanes from "ep" shots
 	shots = cmds.ls(type="shot")
 	print 'DEBUG shots', shots
+	for s in shots[:]:
+		for e in exclude_shots:
+			if e not in s:
+				pass
+			else:
+				shots.remove(s)
+				print 'remove: ', s
+	print 'DEBUG shots', shots
+
 	for i in shots:
+		result = 'OK'
 
 #check shots sequence coherence
 		cur_ind = shots.index(i)
-		print 'DEBUG cur_ind', cur_ind
-		if cur_ind > 0 and 'id' not in i and '0001' not in i:
+		if cur_ind > 0:
+		#if cur_ind > 0 and opt_id not in i or opt_sh0001 not in i:
+			print 'DEBUG cur_ind', cur_ind
+			print 'DEBUG shot:', i
 			prw_ind = shots.index(i) - 1
-			print 'DEBUG i8', i[8:]
-			print 'DEBUG i8-1', shots[prw_ind][8:]
+			#print 'DEBUG i8', i[8:]
+			#print 'DEBUG i8-1', shots[prw_ind][8:]
 			if int(i[8:]) - int(shots[prw_ind][8:]) != 1:
-
 				result = cmds.promptDialog(
 						title='Naming Error',
 						message='Shots: '+ shots[prw_ind] + ' and ' + i,
@@ -112,14 +139,14 @@ def set_step1(args):
 						cancelButton='Cancel',
 						dismissString='Cancel')
 
-				if result == 'OK':
+		if result == 'OK':
 
-					ip = cmds.connectionInfo(i + '.clip', sourceFromDestination = True)
-					if ip:
-						ipp = ip.split('.')[0].split('>')[1]
-						if 'id' not in i:
-							print 'shot:', i, 'imagePlane:', ipp
-							cmds.delete(ipp)
+			ip = cmds.connectionInfo(i + '.clip', sourceFromDestination = True)
+			if ip:
+				ipp = ip.split('.')[0].split('>')[1]
+				if 'id' not in i:
+					print 'shot:', i, 'imagePlane:', ipp
+					cmds.delete(ipp)
 #replace paths in imageplanes
 	if result == 'OK':
 		ips = cmds.ls(type='imagePlane')
@@ -146,26 +173,15 @@ def get_exclude_list():
 	exclude_list = pm.scrollField('EX', q=1, text=True)
 	return exclude_list.split('\n')
 
-def alRunChop(progressControl, checkBoxOpt):
+def alRunChop(progressControl):
     prefix = str(pm.textFieldButtonGrp('NAMEFIELD', q=1, text=1))
-    alChopEmAll(prefix, progressControl, checkBoxOpt)
+    alChopEmAll(prefix, progressControl)
 
-def alChopEmAll(prefix, progressControl, checkBoxOpt):
+def alChopEmAll(prefix, progressControl):
 # Kill all jobs
 	cmds.scriptJob(ka=True)
 
-	print 'START DEBUG'
-	opt_sh0000 = cmds.checkBoxGrp(checkBoxOpt, q=1, value1=1)
-	opt_id = cmds.checkBoxGrp(checkBoxOpt, q=1, value2=1)
-	if opt_sh0000:
-		opt_sh0000 = 'sh0000'
-	else:
-		opt_sh0000 = ' '
-	if opt_id:
-		opt_id = 'id'
-	else:
-		opt_id = ' '
-	print opt_sh0000, opt_id
+	exclude_shots = service_shots_status()
 
 # Get filename and path
 	#fileName = cmds.file(q=1, expandName=1)
@@ -188,9 +204,9 @@ def alChopEmAll(prefix, progressControl, checkBoxOpt):
 		cmds.progressBar(progressControl, edit=True, step=1)
 		#print 'SHOT PRE:', shot
 		#shot = shot.getShotName()
-		print 'SHOT:', shot
-		if opt_id not in str(shot) and opt_sh0000 not in str(shot):
+		if exclude_shots[0] not in str(shot) and exclude_shots[1] not in str(shot):
 		#if 'sh0001' not in str(shot):
+			print 'SHOT:', shot
 			cmds.file(scene_path, prompt=False, force=1, open=1, resetError=1)
 			if location_path: replace_location(location_path)
 
