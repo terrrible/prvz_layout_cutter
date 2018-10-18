@@ -297,7 +297,8 @@ def replace_location(location_path):
 	exclude_list = get_exclude_list()
 	for ref in all_scene_refs:
 		ref_path = str(ref.path)
-		if [True for i in exclude_list if i in ref_path]:
+		ref_namespace = str(ref.namespace)
+		if [True for i in exclude_list if i in ref_path or i in ref_namespace]:
 			print 'LEAVE REF:', str(ref)
 		else:
 			print 'REMOVE REF:', str(ref)
