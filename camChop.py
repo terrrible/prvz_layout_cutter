@@ -3,6 +3,7 @@ import maya.cmds as cmds
 import maya.mel as mel
 import shutil
 import os, sys
+import time
 #import autoedit_main as am
 
 sys.path.append('//PAROVOZ-FRM01//Shotgun//utils2')
@@ -17,8 +18,9 @@ SCRIPT_KEY = 'd8337d21a847a212b98e6f012737eee6d12dff7b74ed71fba7771d278370b585'
 sg = Shotgun(SERVER_PATH, SCRIPT_NAME, SCRIPT_KEY)
 
 #PRJ = os.environ['root']
-PRJ = 'woowoo'
+#PRJ = 'woowoo'
 PRJ_ID = int(os.environ['PRVZ_PROJECT_ID'])
+PRJ_NAME = helpers.get_project_name(PRJ_ID)
 TYPE_ONE = 'locs'
 if PRJ_ID == 134: TYPE_ONE = 'loc'
 #location = '%root%\\0_assets\\locs\\environment_ground\\lawn_tree_little\\3d\\lawn_tree_little_rig.ma'
@@ -61,12 +63,14 @@ def alShotChopOn():
 	cmds.text( label='Step 3: cut 3D animatic' )
 	cmds.separator()
 	#checkBoxOpt = cmds.checkBoxGrp(numberOfCheckBoxes=2, label='Cut Options:    ', labelArray2=['Include sh0001', 'Include ID shots'])
-	cmds.checkBoxGrp('serv_shots_grp',numberOfCheckBoxes=2, label='Cut Options:    ', labelArray2=['Include sh0001', 'Include ID shots'])
+	cmds.checkBoxGrp('serv_shots_grp',numberOfCheckBoxes=2, label='Include Shots:    ', labelArray2=['sh0001', 'ID'])
 
-	progressControl = cmds.progressBar(width=600, visible=False)
+	cmds.text('progress', label='start/end', visible=False)
+	progressControl = cmds.progressBar('progress_control',width=600, visible=False)
 	cmds.scrollField('LOC', editable=True, wordWrap=False, w=600, h=60, text=get_loc())
 	#cmds.textFieldButtonGrp('NAMEFIELD', text="cutscene", bc=lambda *args: alRunChop(), buttonLabel="Chop On!",
 						  #label="Cut Scenes Name Prefix:")
+	cmds.checkBox('copy_flag',label='Copy to 2_prod', value=True)
 	cmds.textFieldButtonGrp('NAMEFIELD', text="cutscene", bc=lambda *args: alRunChop(progressControl), buttonLabel="CUT",
 						  label="Cut Scenes Name Prefix:")
 	cmds.text( label='Exclude List' )
@@ -77,17 +81,20 @@ def alShotChopOn():
 
 def debug(args):
 	print 'START DEBUG'
-	opt_sh0001 = cmds.checkBoxGrp('serv_shots_grp', q=1, value1=1)
-	opt_id = cmds.checkBoxGrp('serv_shots_grp', q=1, value2=1)
-	if opt_sh0001:
-		opt_sh0001 = '0001'
-	else:
-		opt_sh0001 = ''
-	if opt_id:
-		opt_id = 'id'
-	else:
-		opt_id = ''
-	print opt_sh0001, opt_id
+	shots = pm.ls(type="shot")
+	print 'MAX VALUE', len(shots)
+	cmds.progressBar('progress_control', edit=True, progress=0, maxValue=len(shots), visible=True, annotation='test')
+	for shot in shots:
+
+		cmds.text('progress', edit=True, label=shot+'/'+shots[-1], visible=True)
+		#cmds.progressBar('progress_control', edit=True, step=1)
+		print 'SHOT:', shot
+		print 'SHOT:', shot
+		print 'SHOT:', shot
+		#time.sleep(3)
+		for i in xrange(1000000):
+			a = i**30
+		cmds.progressBar('progress_control', edit=True, step=1)
 
 def service_shots_status():
 	print 'START service_shots_status'
@@ -152,7 +159,7 @@ def set_step1(checkBoxOpt):
 		ips = cmds.ls(type='imagePlane')
 		for i in ips:
 			p1 = cmds.getAttr(i + '.imageName')
-			p2 = p1.replace('omega/woody', '%root%')
+			p2 = p1.replace('omega/'+PRJ_NAME, '%root%')
 			cmds.setAttr(i + '.imageName', p2, type='string')
 			print i, p1, '-->', p2, '\n'
 	 
@@ -192,16 +199,16 @@ def alChopEmAll(prefix, progressControl):
 	allCams = pm.ls(type="camera")
 	if not shots: shots = allShots
 
-	print 'MAX VALUE', len(shots)
-	cmds.progressBar(progressControl, edit=True, maxValue=len(shots), visible=True)
-	cmds.progressBar(progressControl, edit=True, step=1)
-
-	location_path = str(pm.scrollField('LOC', q=1, text=1).replace('\\\\omega\\woody', '%root%'))
+	location_path = str(pm.scrollField('LOC', q=1, text=1).replace('\\\\omega\\'+PRJ_NAME, '%root%'))
+	cmds.progressBar('progress_control', edit=True, progress=0, maxValue=len(shots), visible=True)
 
 	for shot in shots:
+
+		print 'MAX VALUE', len(shots)
+		cmds.text('progress', edit=True, label=shot+'/'+shots[-1], visible=True)
+		#cmds.progressBar(progressControl, edit=True, step=1)
 		if cmds.progressBar(progressControl, query=True, isCancelled=True):
 			break
-		cmds.progressBar(progressControl, edit=True, step=1)
 		#print 'SHOT PRE:', shot
 		#shot = shot.getShotName()
 		if exclude_shots[0] not in str(shot) and exclude_shots[1] not in str(shot):
@@ -258,12 +265,14 @@ def alChopEmAll(prefix, progressControl):
 			scene_filename_path = cmds.file(save=1, type="mayaAscii", options="v=0;", f=1)
 
 			#copy scene to work path
-			scene_filename_dest_path = scene_filename_path.rsplit('/',1)[1]
-			scene_filename_workpath = cut_path.replace('cut/','work/')
-			scene_filename_dest_filename_path = scene_filename_workpath.replace('%root%', '//omega/woody') + scene_filename_dest_path
-			print scene_filename_path, '---->', scene_filename_dest_filename_path
-			print '###'*15+'\n'
-			shutil.copy2(scene_filename_path, scene_filename_dest_filename_path)
+			if cmds.checkBox('copy_flag', query=True, value=True) == True:
+				scene_filename_dest_path = scene_filename_path.rsplit('/',1)[1]
+				scene_filename_workpath = cut_path.replace('cut/','work/')
+				scene_filename_dest_filename_path = scene_filename_workpath.replace('%root%', '//omega/'+PRJ_NAME) + scene_filename_dest_path
+				print scene_filename_path, '---->', scene_filename_dest_filename_path
+				print '###'*15+'\n'
+				shutil.copy2(scene_filename_path, scene_filename_dest_filename_path)
+		cmds.progressBar(progressControl, edit=True, step=1)
 
 def createSound(sound_file_path):
 	#pm.sound(offset=1, file=sound_file_path)
@@ -282,7 +291,7 @@ def create_imagePlane(cam, shot, path):
 	mel.eval('AEcameraImagePlaneCommand ' + str(cam_shape) + '.imagePlane ' + str(cam_shape) + '.horizontalFilmAperture ' + str(cam_shape) + '.verticalFilmAperture;')
 	im_plane = pm.listConnections(cam_shape+'.imagePlane[0]', sh=True)[0].split('->')[1]
 	#print 'CAMC', pm.listConnections(cam_shape+'.imagePlane[0]', sh=True)
-	cut_path = path.replace('//omega/woody', '%root%').rsplit('/', 2)[0] + '/' + sh_name + '/' + 'cut/'
+	cut_path = path.replace('//omega/'+PRJ_NAME, '%root%').rsplit('/', 2)[0] + '/' + sh_name + '/' + 'cut/'
 	print 'DEBUG cut path', cut_path
 	cut_filename_path = cut_path + str(shot)+'_cut_v001.mov'
 	pm.setAttr(im_plane+'.imageName', cut_filename_path)
