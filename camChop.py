@@ -275,7 +275,11 @@ def alChopEmAll(prefix, progressControl):
 				print '###'*15+'\n'
 				shutil.copy2(scene_filename_path, scene_filename_dest_filename_path)
 			if cmds.checkBox('copyftp_flag', query=True, value=True) == True:
-				dest_ftp_filename_path = scene_filename_workpath.replace('%root%', '//gamma/homes/ftp'+PRJ_NAME) + scene_filename_dest_path
+				dest_ftp_path = scene_filename_workpath.replace('%root%', '//gamma/homes/ftp'+PRJ_NAME) + '/'
+				if not os.path.exists(dest_ftp_path):
+					print 'MAKING DIR ---> %s' % dest_ftp_path
+					os.makedirs(dest_ftp_path)
+				dest_ftp_filename_path = dest_ftp_path + scene_filename_dest_path
 				print scene_filename_path, '---->', scene_filename_dest_filename_path
 				print '###'*15+'\n'
 				shutil.copy2(scene_filename_path, dest_ftp_filename_path)
