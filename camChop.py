@@ -71,6 +71,8 @@ def alShotChopOn():
 	#cmds.textFieldButtonGrp('NAMEFIELD', text="cutscene", bc=lambda *args: alRunChop(), buttonLabel="Chop On!",
 						  #label="Cut Scenes Name Prefix:")
 	cmds.checkBox('copy_flag',label='Copy to 2_prod', value=True)
+	cmds.checkBox('copyftp_flag',label='Copy to FTP', value=False)
+
 	cmds.textFieldButtonGrp('NAMEFIELD', text="cutscene", bc=lambda *args: alRunChop(progressControl), buttonLabel="CUT",
 						  label="Cut Scenes Name Prefix:")
 	cmds.text( label='Exclude List' )
@@ -265,13 +267,18 @@ def alChopEmAll(prefix, progressControl):
 			scene_filename_path = cmds.file(save=1, type="mayaAscii", options="v=0;", f=1)
 
 			#copy scene to work path
+			scene_filename_dest_path = scene_filename_path.rsplit('/',1)[1]
+			scene_filename_workpath = cut_path.replace('cut/','work/')
 			if cmds.checkBox('copy_flag', query=True, value=True) == True:
-				scene_filename_dest_path = scene_filename_path.rsplit('/',1)[1]
-				scene_filename_workpath = cut_path.replace('cut/','work/')
 				scene_filename_dest_filename_path = scene_filename_workpath.replace('%root%', '//omega/'+PRJ_NAME) + scene_filename_dest_path
 				print scene_filename_path, '---->', scene_filename_dest_filename_path
 				print '###'*15+'\n'
 				shutil.copy2(scene_filename_path, scene_filename_dest_filename_path)
+			if cmds.checkBox('copyftp_flag', query=True, value=True) == True:
+				dest_ftp_filename_path = scene_filename_workpath.replace('%root%', '//gamma/homes/ftp'+PRJ_NAME) + scene_filename_dest_path
+				print scene_filename_path, '---->', scene_filename_dest_filename_path
+				print '###'*15+'\n'
+				shutil.copy2(scene_filename_path, dest_ftp_filename_path)
 		cmds.progressBar(progressControl, edit=True, step=1)
 
 def createSound(sound_file_path):
