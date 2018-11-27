@@ -224,10 +224,13 @@ def alChopEmAll(prefix, progressControl):
 			camShape = cmds.listRelatives(str(cam[0]), shapes=True)[0]
 			print camShape
 			#print '@@3', shot, cam
-			if str(shot) in str(cam[0]):
+			if str(shot) in str(cam[0]) and 'Camera1' in str(cam[0]):
 				camName = 'cam_' + str(cam[0]).split('_')[1].replace('Camera1', '')
 				print 'CAMERA OK\n'
 				cmds.rename(str(cam[0]), camName)
+			elif str(cam[0]) == 'cam_'+str(shot):
+				print 'NEW CAMERA OK\n'
+				pass
 			else:
 				print 'create CAMERA for shot', shot, '\n'
 				cloneCamera(cam, camShape, str(shot))
