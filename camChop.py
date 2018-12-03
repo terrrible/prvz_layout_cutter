@@ -222,12 +222,16 @@ def alChopEmAll(prefix, progressControl):
 			# Get camera for this shot
 			cam = pm.listConnections(shot, type="shape")
 			camShape = cmds.listRelatives(str(cam[0]), shapes=True)[0]
+			print cam
 			print camShape
 			#print '@@3', shot, cam
-			if str(shot) in str(cam[0]):
+			if str(shot) in str(cam[0]) and 'Camera1' in str(cam[0]):
 				camName = 'cam_' + str(cam[0]).split('_')[1].replace('Camera1', '')
 				print 'CAMERA OK\n'
 				cmds.rename(str(cam[0]), camName)
+			elif str(cam[0]) == 'cam_'+str(shot):
+				print 'NEW CAMERA OK\n'
+				pass
 			else:
 				print 'create CAMERA for shot', shot, '\n'
 				cloneCamera(cam, camShape, str(shot))
@@ -256,7 +260,7 @@ def alChopEmAll(prefix, progressControl):
 			pm.delete(allShots)
 
 			save_dir = path + '/' + prefix + '/'
-			full_save_path = path + '/' + prefix + '/' + str(shot) + '_layout_v001'
+			full_save_path = path + '/' + prefix + '/' + ep + '_' + str(shot) + '_layout_v001'
 			print 'DEBUG full_save_path', full_save_path
 			print '###'*15
 			if not os.path.exists(save_dir):
@@ -295,7 +299,10 @@ def create_imagePlane(cam, shot, path):
 
 	#cam = pm.ls('camera1')[0]
 	cam_shape = cam.getShape()
-	sh_name = str(shot).split('_')[1]
+	try:
+		sh_name = str(shot).split('_')[1]
+	except:
+		sh_name = str(shot)
 	#print 'CAM', cam
 	#print 'CAMS', cam_shape
 	mel.eval('source AEcameraImagePlaneNew')
