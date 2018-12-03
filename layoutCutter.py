@@ -260,7 +260,10 @@ def alChopEmAll(prefix, progressControl):
 			pm.delete(allShots)
 
 			save_dir = path + '/' + prefix + '/'
-			full_save_path = path + '/' + prefix + '/' + ep + '_' + str(shot) + '_layout_v001'
+			if ep not in str(shot):
+				full_save_path = path + '/' + prefix + '/' + ep + '_' + str(shot) + '_layout_v001'
+			else:
+				full_save_path = path + '/' + prefix + '/' + str(shot) + '_layout_v001'
 			print 'DEBUG full_save_path', full_save_path
 			print '###'*15
 			if not os.path.exists(save_dir):
@@ -309,7 +312,10 @@ def create_imagePlane(cam, shot, path):
 	mel.eval('AEcameraImagePlaneCommand ' + str(cam_shape) + '.imagePlane ' + str(cam_shape) + '.horizontalFilmAperture ' + str(cam_shape) + '.verticalFilmAperture;')
 	im_plane = pm.listConnections(cam_shape+'.imagePlane[0]', sh=True)[0].split('->')[1]
 	#print 'CAMC', pm.listConnections(cam_shape+'.imagePlane[0]', sh=True)
-	cut_path = path.replace('//omega/'+PRJ_NAME, '%root%').rsplit('/', 2)[0] + '/' + sh_name + '/' + 'cut/'
+	if ep not in str(shot):
+		cut_path = path.replace('//omega/'+PRJ_NAME, '%root%').rsplit('/', 2)[0] + '/' + ep + '_' + sh_name + '/' + 'cut/'
+	else:
+		cut_path = path.replace('//omega/'+PRJ_NAME, '%root%').rsplit('/', 2)[0] + '/' + sh_name + '/' + 'cut/'
 	print 'DEBUG cut path', cut_path
 	cut_filename_path = cut_path + str(shot)+'_cut_v001.mov'
 	pm.setAttr(im_plane+'.imageName', cut_filename_path)
