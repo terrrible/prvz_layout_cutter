@@ -17,21 +17,18 @@ SCRIPT_KEY = 'd8337d21a847a212b98e6f012737eee6d12dff7b74ed71fba7771d278370b585'
 
 sg = Shotgun(SERVER_PATH, SCRIPT_NAME, SCRIPT_KEY)
 
-#PRJ = os.environ['root']
-#PRJ = 'woowoo'
 PRJ_ID = int(os.environ['PRVZ_PROJECT_ID'])
 PRJ_NAME = helpers.get_project_name(PRJ_ID)
+
 TYPE_ONE = 'locs'
 if PRJ_ID == 134: TYPE_ONE = 'loc'
-#location = '%root%\\0_assets\\locs\\environment_ground\\lawn_tree_little\\3d\\lawn_tree_little_rig.ma'
-scene_path = cmds.file(q=1, expandName=1)
-path, separator, filename = scene_path.rpartition("/")
-ep = filename.split('_')[0]
+
+SCENE_FULLPATH = cmds.file(q=1, expandName=1)
+SCENE_PATH, SEPARATOR, FILENAME = SCENE_FULLPATH.rpartition("/")
+EP = FILENAME.split('_')[0]
 
 def get_loc():
-	#project = get_prj_id('woody')
-	#prj_id = 127 #woody
-	loc_list = sg.find('Asset', [['project.Project.id', 'is', PRJ_ID], ['custom_entity01_sg_assets_custom_entity01s.CustomEntity01.code', 'is', ep], ['sg_type_one.CustomEntity04.code', 'is', TYPE_ONE]], ['code', 'sg_reference'])
+	loc_list = sg.find('Asset', [['project.Project.id', 'is', PRJ_ID], ['custom_entity01_sg_assets_custom_entity01s.CustomEntity01.code', 'is', EP], ['sg_type_one.CustomEntity04.code', 'is', TYPE_ONE]], ['code', 'sg_reference'])
 	print loc_list
 	loc_paths = [os.path.abspath(i['sg_reference']['local_path']+'3d\\'+i['sg_reference']['name']+'_rig.ma') for i in loc_list]
 	print '\n'.join(loc_paths)
@@ -45,9 +42,9 @@ def get_prj_id(prj_name):
 
 def alShotChopOn():
 
-	if cmds.window('CHOPOUTWIN', exists=True) == True:
-		cmds.deleteUI('CHOPOUTWIN')
-	window = cmds.window('CHOPOUTWIN', title="animania Shot Choppa")
+	if cmds.window('LAYOUTCUTTER', exists=True) == True:
+		cmds.deleteUI('LAYOUTCUTTER')
+	window = cmds.window('LAYOUTCUTTER', title="Let's get some wood..")
 	cmds.columnLayout()
 
 	cmds.text( label='Step 1: Remove imageplanes from "ep" shots and set absolute paths. Set camera attributes.' )
@@ -55,25 +52,22 @@ def alShotChopOn():
 	cmds.button( label='Step 1', command=set_step1 )
 	cmds.separator( height=5, style='singleDash' )
 
-	cmds.text( label='Step 2: Location assembly (Woody) . Remove "chars" references, remove shots and cameras.' )
+	cmds.text( label='Step 2: Location assembly . Remove "chars" references, remove shots and cameras.' )
 	cmds.separator()
 	cmds.button( label='Step 2', command=set_step2 )
 	cmds.separator( height=5, style='singleDash' )
 
 	cmds.text( label='Step 3: cut 3D animatic' )
 	cmds.separator()
-	#checkBoxOpt = cmds.checkBoxGrp(numberOfCheckBoxes=2, label='Cut Options:    ', labelArray2=['Include sh0001', 'Include ID shots'])
-	cmds.checkBoxGrp('serv_shots_grp',numberOfCheckBoxes=2, label='Include Shots:    ', labelArray2=['sh0001', 'ID'])
+	cmds.checkBoxGrp('serv_shots_grp', numberOfCheckBoxes=2, label='Include Shots:    ', labelArray2=['sh0001', 'ID'])
 
 	cmds.text('progress', label='start/end', visible=False)
 	progressControl = cmds.progressBar('progress_control',width=600, visible=False)
 	cmds.scrollField('LOC', editable=True, wordWrap=False, w=600, h=60, text=get_loc())
-	#cmds.textFieldButtonGrp('NAMEFIELD', text="cutscene", bc=lambda *args: alRunChop(), buttonLabel="Chop On!",
-						  #label="Cut Scenes Name Prefix:")
 	cmds.checkBox('copy_flag',label='Copy to 2_prod', value=True)
 	cmds.checkBox('copyftp_flag',label='Copy to FTP', value=False)
 
-	cmds.textFieldButtonGrp('NAMEFIELD', text="cutscene", bc=lambda *args: alRunChop(progressControl), buttonLabel="CUT",
+	cmds.textFieldButtonGrp('NAMEFIELD', text="cutscene", bc=lambda *args: start_cutting(progressControl), buttonLabel="CUT",
 						  label="Cut Scenes Name Prefix:")
 	cmds.text( label='Exclude List' )
 	cmds.scrollField('EX', editable=True, wordWrap=False, w=250, h=250, text='chars\nlocs\nloc')
@@ -82,21 +76,52 @@ def alShotChopOn():
 	cmds.showWindow(window)
 
 def debug(args):
-	print 'START DEBUG'
-	shots = pm.ls(type="shot")
-	print 'MAX VALUE', len(shots)
-	cmds.progressBar('progress_control', edit=True, progress=0, maxValue=len(shots), visible=True, annotation='test')
-	for shot in shots:
+	shot = pm.ls(sl=True)[0]
+	get_shot_paths(shot)
 
-		cmds.text('progress', edit=True, label=shot+'/'+shots[-1], visible=True)
-		#cmds.progressBar('progress_control', edit=True, step=1)
-		print 'SHOT:', shot
-		print 'SHOT:', shot
-		print 'SHOT:', shot
-		#time.sleep(3)
-		for i in xrange(1000000):
-			a = i**30
-		cmds.progressBar('progress_control', edit=True, step=1)
+def create_folder(dst_path):
+	if not os.path.exists(dst_path):
+		print 'MAKING DIR ---> %s' % dst_path
+		os.makedirs(dst_path)
+
+def copy_it(src, dst):
+	print src, '---->', dst
+	print '###'*15+'\n'
+	shutil.copy2(src, dst)
+
+def get_shot_paths(shot):
+	prefix = str(pm.textFieldButtonGrp('NAMEFIELD', q=1, text=1))
+	try:
+		shot = str(shot).split('_')[1]
+	except:
+		shot = str(shot)
+	unresolved_PATH = SCENE_PATH.replace('//omega/'+PRJ_NAME, '%root%')
+	shot_cut_path_unr = unresolved_PATH.rsplit('/', 2)[0] + '/' + shot + '/' + 'cut/'
+	shot_work_path_unr = shot_cut_path_unr.replace('cut/','work/')
+	shot_work_path_res = shot_work_path_unr.replace('%root%', '//omega/'+PRJ_NAME)
+	shot_work_path_ftp = shot_work_path_unr.replace('%root%', '//gamma/homes/ftp'+PRJ_NAME)
+	shot_cut_filename_path_unr = shot_cut_path_unr + shot +'_cut_v001.mov'
+	audio_filename_path_unr = shot_cut_path_unr + shot + '_cut_v001.wav'
+	shot_path_res = SCENE_PATH + '/' + prefix + '/'
+	#shot_save_noextpath = shot_path_res + EP + '_' + str(shot) + '_layout_v001'
+	shot_filename = EP + '_' + str(shot) + '_layout_v001.ma'
+	shot_filename_path_res = shot_path_res + shot_filename
+	shot_filename_work_path_res = shot_work_path_res + shot_filename
+	shot_filename_work_path_ftp = shot_work_path_ftp + shot_filename
+				#dest_ftp_path = scene_filename_workpath.replace('%root%', '//gamma/homes/ftp'+PRJ_NAME) + '/'
+				#dest_ftp_filename_path = dest_ftp_path + scene_filename_dest_path
+	print 'shot:', shot
+	print 'shot_cut_path_unr:', shot_cut_path_unr
+	print 'shot_work_path_unr:', shot_work_path_unr
+	print 'shot_work_path_res:', shot_work_path_res
+	print 'shot_work_path_ftp:', shot_work_path_ftp
+	print 'shot_filename:', shot_filename
+	print 'shot_filename_work_path_res:', shot_filename_work_path_res
+	print 'shot_filename_work_path_ftp:', shot_filename_work_path_ftp
+	print 'shot_cut_filename_path_unr:', shot_cut_filename_path_unr
+	print 'audio_filename_path_unr:', audio_filename_path_unr
+	print 'shot_path_res:', shot_path_res
+	print 'shot_filename_path_res:', shot_filename_path_res
 
 def service_shots_status():
 	print 'START service_shots_status'
@@ -113,9 +138,10 @@ def service_shots_status():
 	return [opt_sh0001, opt_id]
 
 def set_step1(checkBoxOpt):
+	#get excluded shots
 	exclude_shots = service_shots_status()
 
-#remove imageplanes from "ep" shots
+	#remove imageplanes from "ep" shots
 	shots = cmds.ls(type="shot")
 	print 'DEBUG shots', shots
 	for s in shots[:]:
@@ -125,12 +151,11 @@ def set_step1(checkBoxOpt):
 			else:
 				shots.remove(s)
 				print 'remove: ', s
-	print 'DEBUG shots', shots
+	#print 'DEBUG shots', shots
+	#for i in shots:
+		#result = 'OK'
 
-	for i in shots:
-		result = 'OK'
-
-#check shots sequence coherence
+        #check shots sequence coherence
 		cur_ind = shots.index(i)
 		if cur_ind > 0:
 		#if cur_ind > 0 and opt_id not in i or opt_sh0001 not in i:
@@ -177,24 +202,30 @@ def set_step2(args):
 		if 'chars' in ref_path:
 			print 'unload', str(ref)
 			ref.remove()
+	
+	#remove shots, cameras and audio
+	shots = pm.ls(type="shot")
+	cams =  getCameras()
+	audio = pm.ls(type='audio')
+	for i in shots+cams+audio:
+		pm.delete(i)
+		print 'delete node: %s' %i
 
-def get_exclude_list():
+def get_exclude_asset_list():
 	exclude_list = pm.scrollField('EX', q=1, text=True)
 	return exclude_list.split('\n')
 
-def alRunChop(progressControl):
-    prefix = str(pm.textFieldButtonGrp('NAMEFIELD', q=1, text=1))
-    alChopEmAll(prefix, progressControl)
+#def alRunChop(progressControl):
+	#prefix = str(pm.textFieldButtonGrp('NAMEFIELD', q=1, text=1))
+	#start_cutting(prefix, progressControl)
 
-def alChopEmAll(prefix, progressControl):
+def start_cutting(progressControl):
+	#prefix = str(pm.textFieldButtonGrp('NAMEFIELD', q=1, text=1))
 # Kill all jobs
 	cmds.scriptJob(ka=True)
 
 	exclude_shots = service_shots_status()
 
-# Get filename and path
-	#fileName = cmds.file(q=1, expandName=1)
-	#path, separator, filename = fileName.rpartition("/")
 # Get shots
 	shots = [i.getShotName() for i in pm.ls(type="shot", sl=1)]
 	allShots = pm.ls(type="shot")
@@ -205,10 +236,7 @@ def alChopEmAll(prefix, progressControl):
 	cmds.progressBar('progress_control', edit=True, progress=0, maxValue=len(shots), visible=True)
 
 	for shot in shots:
-
-		print 'MAX VALUE', len(shots)
 		cmds.text('progress', edit=True, label=shot+'/'+shots[-1], visible=True)
-		#cmds.progressBar(progressControl, edit=True, step=1)
 		if cmds.progressBar(progressControl, query=True, isCancelled=True):
 			break
 		#print 'SHOT PRE:', shot
@@ -216,15 +244,19 @@ def alChopEmAll(prefix, progressControl):
 		if exclude_shots[0] not in str(shot) and exclude_shots[1] not in str(shot):
 		#if 'sh0001' not in str(shot):
 			print 'SHOT:', shot
-			cmds.file(scene_path, prompt=False, force=1, open=1, resetError=1)
+			cmds.file(SCENE_FULLPATH, prompt=False, force=1, open=1, resetError=1)
+
+			#remove audio
+			audio = pm.ls(type='audio')
+			for i in audio:
+				pm.delete(i)
+
 			if location_path: replace_location(location_path)
 
 			# Get camera for this shot
 			cam = pm.listConnections(shot, type="shape")
 			camShape = cmds.listRelatives(str(cam[0]), shapes=True)[0]
-			print cam
-			print camShape
-			#print '@@3', shot, cam
+
 			if str(shot) in str(cam[0]) and 'Camera1' in str(cam[0]):
 				camName = 'cam_' + str(cam[0]).split('_')[1].replace('Camera1', '')
 				print 'CAMERA OK\n'
@@ -235,11 +267,11 @@ def alChopEmAll(prefix, progressControl):
 			else:
 				print 'create CAMERA for shot', shot, '\n'
 				cloneCamera(cam, camShape, str(shot))
-
-			#cmds.setAttr(str(cam[0]) + '.horizontalFilmAperture', 1.679)
+			
+			shot_paths = get_shot_paths(shot)
 
 			#create image plane for shot camera
-			cut_path = create_imagePlane(cam[0], shot, path)
+			create_imagePlane(cam[0], shot, shot_paths['shot_cut_filename_path_unr'])
 
 			#cleanup cameras
 			tmp =  getCameras()
@@ -248,8 +280,7 @@ def alChopEmAll(prefix, progressControl):
 			cmds.delete(tmp)#delete unused cameras
 
 			#create sound
-			sound_file_path = cut_path + str(shot) + '_cut_v001.wav'
-			createSound(sound_file_path)
+			createSound(shot_paths['audio_filename_path_unr'])
 
 			sf = int(pm.getAttr(str(shot) + ".startFrame"))
 			# get out shot's range and move all animation of it to 1st frame
@@ -258,38 +289,22 @@ def alChopEmAll(prefix, progressControl):
 			pm.playbackOptions(max=(1 + ef - sf), ast=1, aet=(1 + ef - sf), min=1)
 			pm.lockNode(allShots, lock=False)
 			pm.delete(allShots)
+			
+			#create destination folder for saving scene
+			create_folder(shot_paths['shot_path_res'])
 
-			save_dir = path + '/' + prefix + '/'
-			if ep not in str(shot):
-				full_save_path = path + '/' + prefix + '/' + ep + '_' + str(shot) + '_layout_v001'
-			else:
-				full_save_path = path + '/' + prefix + '/' + str(shot) + '_layout_v001'
-			print 'DEBUG full_save_path', full_save_path
-			print '###'*15
-			if not os.path.exists(save_dir):
-				print 'MAKING DIR ---> %s' % save_dir
-				os.makedirs(save_dir)
+			#rename and save maya scene
+			cmds.file(rename=(shot_paths['shot_filename_path_res']))
+			cmds.file(save=1, type="mayaAscii", options="v=0;", f=1)
 
-			cmds.file(rename=(full_save_path))
-			scene_filename_path = cmds.file(save=1, type="mayaAscii", options="v=0;", f=1)
-
-			#copy scene to work path
-			scene_filename_dest_path = scene_filename_path.rsplit('/',1)[1]
-			scene_filename_workpath = cut_path.replace('cut/','work/')
+			#copy scene to work path and ftp
 			if cmds.checkBox('copy_flag', query=True, value=True) == True:
-				scene_filename_dest_filename_path = scene_filename_workpath.replace('%root%', '//omega/'+PRJ_NAME) + scene_filename_dest_path
-				print scene_filename_path, '---->', scene_filename_dest_filename_path
-				print '###'*15+'\n'
-				shutil.copy2(scene_filename_path, scene_filename_dest_filename_path)
+				copy_it(shot_paths['shot_filename_path_res'], shot_paths['shot_filename_work_path_res'])
+
 			if cmds.checkBox('copyftp_flag', query=True, value=True) == True:
-				dest_ftp_path = scene_filename_workpath.replace('%root%', '//gamma/homes/ftp'+PRJ_NAME) + '/'
-				if not os.path.exists(dest_ftp_path):
-					print 'MAKING DIR ---> %s' % dest_ftp_path
-					os.makedirs(dest_ftp_path)
-				dest_ftp_filename_path = dest_ftp_path + scene_filename_dest_path
-				print scene_filename_path, '---->', scene_filename_dest_filename_path
-				print '###'*15+'\n'
-				shutil.copy2(scene_filename_path, dest_ftp_filename_path)
+				create_folder(shot_paths['shot_work_path_ftp'])
+				copy_it(shot_paths['shot_filename_path_res'], shot_paths['shot_filename_work_path_ftp'])
+
 		cmds.progressBar(progressControl, edit=True, step=1)
 
 def createSound(sound_file_path):
@@ -298,36 +313,21 @@ def createSound(sound_file_path):
 	cmds.setAttr(sound_node+'.offset', 1)
 	cmds.setAttr(sound_node+'.filename', sound_file_path, type='string')
 
-def create_imagePlane(cam, shot, path):
+def create_imagePlane(cam, shot, shot_cut_filename_path_unr):
 
-	#cam = pm.ls('camera1')[0]
 	cam_shape = cam.getShape()
-	try:
-		sh_name = str(shot).split('_')[1]
-	except:
-		sh_name = str(shot)
-	#print 'CAM', cam
-	#print 'CAMS', cam_shape
 	mel.eval('source AEcameraImagePlaneNew')
 	mel.eval('AEcameraImagePlaneCommand ' + str(cam_shape) + '.imagePlane ' + str(cam_shape) + '.horizontalFilmAperture ' + str(cam_shape) + '.verticalFilmAperture;')
 	im_plane = pm.listConnections(cam_shape+'.imagePlane[0]', sh=True)[0].split('->')[1]
-	#print 'CAMC', pm.listConnections(cam_shape+'.imagePlane[0]', sh=True)
-	if ep not in str(shot):
-		cut_path = path.replace('//omega/'+PRJ_NAME, '%root%').rsplit('/', 2)[0] + '/' + ep + '_' + sh_name + '/' + 'cut/'
-	else:
-		cut_path = path.replace('//omega/'+PRJ_NAME, '%root%').rsplit('/', 2)[0] + '/' + sh_name + '/' + 'cut/'
-	print 'DEBUG cut path', cut_path
-	cut_filename_path = cut_path + str(shot)+'_cut_v001.mov'
-	pm.setAttr(im_plane+'.imageName', cut_filename_path)
-	print 'DEBUG cut_filename_path', cut_filename_path
+	pm.setAttr(im_plane+'.imageName', shot_cut_filename_path_unr)
+	#print 'DEBUG shot_cut_filename_path_unr', shot_cut_filename_path_unr
 	pm.setAttr(im_plane+'.type', 2)
-	return cut_path
 
 def replace_location(location_path):
 	print 'DEBUG location_path', location_path
 	location_path = location_path.split('\n')
 	all_scene_refs = pm.listReferences()
-	exclude_list = get_exclude_list()
+	exclude_list = get_exclude_asset_list()
 	for ref in all_scene_refs:
 		ref_path = str(ref.path)
 		ref_namespace = str(ref.namespace)
