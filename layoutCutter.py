@@ -101,26 +101,26 @@ def get_shot_paths(shot):
 	shot_work_path_unr = shot_cut_path_unr.replace('cut/','work/')
 	shot_work_path_res = shot_work_path_unr.replace('%root%', '//omega/'+PRJ_NAME)
 	shot_work_path_ftp = shot_work_path_unr.replace('%root%', '//gamma/homes/ftp'+PRJ_NAME)
-	shot_cut_filename_path_unr = shot_cut_path_unr + shot.name() +'_cut_v001.mov'
-	audio_filename_path_unr = shot_cut_path_unr + shot.name() + '_cut_v001.wav'
+	shot_cut_filename_path_unr = shot_cut_path_unr + EP + '_' + shot.name() +'_cut_v001.mov'
+	audio_filename_path_unr = shot_cut_path_unr + EP + '_' + shot.name() + '_cut_v001.wav'
 	shot_path_res = SCENE_PATH + '/' + prefix + '/'
 	#shot_save_noextpath = shot_path_res + EP + '_' + shot.name() + '_layout_v001'
 	shot_filename = EP + '_' + shot.name() + '_layout_v001.ma'
 	shot_filename_path_res = shot_path_res + shot_filename
 	shot_filename_work_path_res = shot_work_path_res + shot_filename
 	shot_filename_work_path_ftp = shot_work_path_ftp + shot_filename
-	print 'shot:', shot.name()
-	print 'shot_cut_path_unr:', shot_cut_path_unr
-	print 'shot_work_path_unr:', shot_work_path_unr
-	print 'shot_work_path_res:', shot_work_path_res
-	print 'shot_work_path_ftp:', shot_work_path_ftp
-	print 'shot_filename:', shot_filename
-	print 'shot_filename_work_path_res:', shot_filename_work_path_res
-	print 'shot_filename_work_path_ftp:', shot_filename_work_path_ftp
-	print 'shot_cut_filename_path_unr:', shot_cut_filename_path_unr
-	print 'audio_filename_path_unr:', audio_filename_path_unr
-	print 'shot_path_res:', shot_path_res
-	print 'shot_filename_path_res:', shot_filename_path_res
+	#print 'shot:', shot.name()
+	#print 'shot_cut_path_unr:', shot_cut_path_unr
+	#print 'shot_work_path_unr:', shot_work_path_unr
+	#print 'shot_work_path_res:', shot_work_path_res
+	#print 'shot_work_path_ftp:', shot_work_path_ftp
+	#print 'shot_filename:', shot_filename
+	#print 'shot_filename_work_path_res:', shot_filename_work_path_res
+	#print 'shot_filename_work_path_ftp:', shot_filename_work_path_ftp
+	#print 'shot_cut_filename_path_unr:', shot_cut_filename_path_unr
+	#print 'audio_filename_path_unr:', audio_filename_path_unr
+	#print 'shot_path_res:', shot_path_res
+	#print 'shot_filename_path_res:', shot_filename_path_res
 
 	shot_paths = {	'shot_cut_path_unr': shot_cut_path_unr,
 					'shot_work_path_unr': shot_work_path_unr,
@@ -134,6 +134,8 @@ def get_shot_paths(shot):
 					'shot_path_res': shot_path_res,
 					'shot_filename_path_res': shot_filename_path_res,
 					}
+	for i in shot_paths.items()
+		print i
 
 	return shot_paths
 
@@ -241,7 +243,6 @@ def start_cutting(progressControl):
 	exclude_shots = service_shots_status()
 
 # Get shots
-	#shots = [i.getShotName() for i in pm.ls(type="shot", sl=1)]
 	shots = pm.ls(type="shot", sl=1)
 	allShots = pm.ls(type="shot")
 	allCams = pm.ls(type="camera")
@@ -257,6 +258,7 @@ def start_cutting(progressControl):
 		if exclude_shots[0] not in str(shot) and exclude_shots[1] not in str(shot):
 			print 'SHOT:', shot
 			print 'SHOT type:', type(shot)
+			shot_paths = get_shot_paths(shot)
 			#if count != 0:
 			cmds.file(SCENE_FULLPATH, prompt=False, force=1, open=1, resetError=1)
 
@@ -265,7 +267,10 @@ def start_cutting(progressControl):
 			for i in audio:
 				pm.delete(i)
 
-			if location_path: replace_location(location_path)
+			#fix ref paths, remove all refs except exclude list and load location ref
+			all_scene_refs = pm.listReferences()
+			fix_ref_paths(all_scene_refs)
+			replace_location(location_path, all_scene_refs, shot_paths['shot_filename'])
 
 			# Get camera for this shot
 			cam = pm.listConnections(shot, type="shape")
@@ -281,35 +286,26 @@ def start_cutting(progressControl):
 			else:
 				print 'create CAMERA for shot', shot, '\n'
 				cloneCamera(cam, camShape, str(shot))
-			
-			shot_paths = get_shot_paths(shot)
 
 			#create image plane for shot camera
-			print '@cam[0]', cam[0]
-			print '@shot', shot
-			print '@shot_paths["shot_cut_filename_path_unr"]', shot_paths['shot_cut_filename_path_unr']
 			im_plane = create_imagePlane(cam[0], shot, shot_paths['shot_cut_filename_path_unr'])
 
 			#cleanup cameras
-			print '@1im_plane exists', pm.ls(im_plane)[0].exists()
 			tmp =  getCameras()
 			tmp.remove(str(cam[0]))
 			print 'delete cam',str(cam[0]),  tmp
 			cmds.delete(tmp)#delete unused cameras
-			print '@2im_plane exists', pm.ls(im_plane)[0].exists()
 
 			#create sound
 			createSound(shot_paths['audio_filename_path_unr'])
 
-			sf = int(pm.getAttr(str(shot) + ".startFrame"))
 			# get out shot's range and move all animation of it to 1st frame
-			ef = int(pm.getAttr(str(shot) + ".endFrame"))
+			sf = int(shot.getStartTime())
+			ef = int(shot.getEndTime())
 			alMoveACsegment(sf, ef)
 			pm.playbackOptions(max=(1 + ef - sf), ast=1, aet=(1 + ef - sf), min=1)
 			pm.lockNode(allShots, lock=False)
-			print '@3im_plane exists', allShots
 			pm.delete(allShots)
-			print '@3im_plane exists', pm.ls(im_plane)[0].exists()
 			
 			#create destination folder for saving scene
 			create_folder(shot_paths['shot_path_res'])
@@ -351,24 +347,33 @@ def create_imagePlane(cam, shot, shot_cut_filename_path_unr):
 	pm.disconnectAttr(shot+'.clip')
 	return im_plane
 
-def replace_location(location_path):
-	print 'DEBUG location_path', location_path
-	location_path = location_path.split('\n')
-	all_scene_refs = pm.listReferences()
-	exclude_list = get_exclude_asset_list()
-	for ref in all_scene_refs:
-		ref_path = str(ref.path)
-		ref_namespace = str(ref.namespace)
-		if [True for i in exclude_list if i in ref_path or i in ref_namespace]:
-			print 'LEAVE REF:', str(ref)
+def fix_ref_paths(all_scene_refs):
+	for i in all_scene_refs:
+		path_unr = i.unresolvedPath()
+		if '%root%' not in path_unr:
+			path_fix = path_unr.replace('//','/').split('/',3)[-1]
+			print 'replace for: ' + str(i) + 'with: ' + '%root%'+'/' + path_fix
+			i.replaceWith('%root%'+'/'+path_fix)
+
+def replace_location(location_path, all_scene_refs, shot_filename):
+	if location_path:
+		location_path = location_path.split('\n')
+		exclude_list = get_exclude_asset_list()
+		for ref in all_scene_refs:
+			ref_path = str(ref.path)
+			ref_namespace = str(ref.namespace)
+			if [True for i in exclude_list if i in ref_path or i in ref_namespace]:
+				print 'LEAVE REF:', str(ref)
+			else:
+				print 'REMOVE REF:', str(ref)
+				ref.remove()
+		for loc in location_path:
+			print loc
+			shot_filename_no_ext = shot_filename.split('.')[0]
+			print 'LOCATION', loc, shot_filename_no_ext
+			pm.createReference(loc, namespace=shot_filename_no_ext)
 		else:
-			print 'REMOVE REF:', str(ref)
-			ref.remove()
-	for loc in location_path:
-		print loc
-		scenename = loc.rsplit('\\', 1)[1].split('.')[0]
-		print 'LOCATION', loc, scenename
-		pm.createReference(loc, namespace=scenename)
+			print 'NO LOCATION PROVIDED'
 
 def getCameras():
 # Get all cameras first
