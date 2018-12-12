@@ -134,7 +134,7 @@ def get_shot_paths(shot):
 					'shot_path_res': shot_path_res,
 					'shot_filename_path_res': shot_filename_path_res,
 					}
-	for i in shot_paths.items()
+	for i in shot_paths.items():
 		print i
 
 	return shot_paths
