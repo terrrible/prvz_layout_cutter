@@ -93,9 +93,9 @@ def copy_it(src, dst):
 def get_shot_paths(shot):
 	print 'FUNC get_shot_paths, shot type:', type(shot)
 	prefix = str(pm.textFieldButtonGrp('NAMEFIELD', q=1, text=1))
-	if '_' in str(shot):
-		print 'Renaming shot %s' %str(shot)
-		shot.rename(str(shot).split('_')[1])
+	#if '_' in str(shot):
+		#print 'Renaming shot %s' %str(shot)
+		#shot.rename(str(shot).split('_')[1])
 	unresolved_PATH = SCENE_PATH.replace('//omega/'+PRJ_NAME, '%root%')
 	shot_cut_path_unr = unresolved_PATH.rsplit('/', 2)[0] + '/' + shot.name() + '/' + 'cut/'
 	shot_work_path_unr = shot_cut_path_unr.replace('cut/','work/')
@@ -134,7 +134,7 @@ def get_shot_paths(shot):
 					'shot_path_res': shot_path_res,
 					'shot_filename_path_res': shot_filename_path_res,
 					}
-	for i in shot_paths.items()
+	for i in shot_paths.items():
 		print i
 
 	return shot_paths
@@ -235,6 +235,12 @@ def get_exclude_asset_list():
 	#prefix = str(pm.textFieldButtonGrp('NAMEFIELD', q=1, text=1))
 	#start_cutting(prefix, progressControl)
 
+def fix_shot_naming(shot):
+	if '_' in str(shot):
+		shot_new_name = str(shot).split('_')[1]
+		print 'Renaming shot %s' %shot_new_name
+		return shot.rename(shot_new_name)
+
 def start_cutting(progressControl):
 	#prefix = str(pm.textFieldButtonGrp('NAMEFIELD', q=1, text=1))
 # Kill all jobs
@@ -258,9 +264,10 @@ def start_cutting(progressControl):
 		if exclude_shots[0] not in str(shot) and exclude_shots[1] not in str(shot):
 			print 'SHOT:', shot
 			print 'SHOT type:', type(shot)
-			shot_paths = get_shot_paths(shot)
 			#if count != 0:
 			cmds.file(SCENE_FULLPATH, prompt=False, force=1, open=1, resetError=1)
+			shot = fix_shot_naming(shot)
+			shot_paths = get_shot_paths(shot)
 
 			#remove audio
 			audio = pm.ls(type='audio')
@@ -273,9 +280,13 @@ def start_cutting(progressControl):
 			replace_location(location_path, all_scene_refs, shot_paths['shot_filename'])
 
 			# Get camera for this shot
+			print '@DEBUG start Get camera for this shot'
 			cam = pm.listConnections(shot, type="shape")
+			print '@DEBUG cam', cam
 			camShape = cmds.listRelatives(str(cam[0]), shapes=True)[0]
+			print '@DEBUG camShape', camShape
 
+			print '@DEBUG start Get camera for this shot2'
 			if str(shot) in str(cam[0]) and 'Camera1' in str(cam[0]):
 				camName = 'cam_' + str(cam[0]).split('_')[1].replace('Camera1', '')
 				print 'CAMERA OK\n'
@@ -297,20 +308,29 @@ def start_cutting(progressControl):
 			cmds.delete(tmp)#delete unused cameras
 
 			#create sound
+			print '@DEBUG create sound'
 			createSound(shot_paths['audio_filename_path_unr'])
 
 			# get out shot's range and move all animation of it to 1st frame
+			print '@DEBUG move all animation'
 			sf = int(shot.getStartTime())
 			ef = int(shot.getEndTime())
 			alMoveACsegment(sf, ef)
 			pm.playbackOptions(max=(1 + ef - sf), ast=1, aet=(1 + ef - sf), min=1)
+			print '@DEBUG move all animation1'
+			print shots
+			allShots = pm.ls(type='shot')
 			pm.lockNode(allShots, lock=False)
+			print '@DEBUG move all animation2'
+			print shots
 			pm.delete(allShots)
 			
 			#create destination folder for saving scene
+			print '@DEBUG create destination folder'
 			create_folder(shot_paths['shot_path_res'])
 
 			#rename and save maya scene
+			print '@DEBUG rename and save maya scene'
 			cmds.file(rename=(shot_paths['shot_filename_path_res']))
 			cmds.file(save=1, type="mayaAscii", options="v=0;", f=1)
 
@@ -356,6 +376,7 @@ def fix_ref_paths(all_scene_refs):
 			i.replaceWith('%root%'+'/'+path_fix)
 
 def replace_location(location_path, all_scene_refs, shot_filename):
+	print '@DEBUG start replace_location'
 	if location_path:
 		location_path = location_path.split('\n')
 		exclude_list = get_exclude_asset_list()
