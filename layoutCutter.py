@@ -390,9 +390,10 @@ def replace_location(location_path, all_scene_refs, shot_filename):
 				ref.remove()
 		for loc in location_path:
 			print loc
-			shot_filename_no_ext = shot_filename.split('.')[0]
+			#shot_filename_no_ext = shot_filename.split('.')[0]
+			loc_namespace = location_path.rsplit('\\',1)[1].split('.')[0]
 			print 'LOCATION', loc, shot_filename_no_ext
-			pm.createReference(loc, namespace=shot_filename_no_ext)
+			pm.createReference(loc, namespace=loc_namespace)
 		else:
 			print 'NO LOCATION PROVIDED'
 
