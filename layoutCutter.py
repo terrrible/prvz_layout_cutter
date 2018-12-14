@@ -227,6 +227,8 @@ def set_step2(args):
 		if 'chars' in ref_path:
 			print 'unload', str(ref)
 			ref.remove()
+
+	fix_ref_paths(all_scene_refs)
 	
 	#remove shots, cameras and audio
 	shots = pm.ls(type="shot")
