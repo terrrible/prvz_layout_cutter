@@ -77,8 +77,17 @@ def alShotChopOn():
 
 def debug(args):
 	print 'DEBUG func'
-	shot = pm.ls(sl=True)[0]
-	get_shot_paths(shot)
+	all_scene_refs = [i for i in pm.listReferences() if 'back' in i.path]
+	print all_scene_refs
+	fix_ref_paths(all_scene_refs)
+	exclude_list = get_exclude_asset_list()
+	for ref in all_scene_refs:
+		ref_path = str(ref.path)
+		ref_namespace = str(ref.namespace)
+		if [True for i in exclude_list if i in ref_path.split('/') or i in ref_namespace.split('_')]:
+			print 'LEAVE REF:', str(ref)
+		else:
+			print 'REMOVE REF:', str(ref)
 
 def create_folder(dst_path):
 	if not os.path.exists(dst_path):
@@ -372,7 +381,7 @@ def fix_ref_paths(all_scene_refs):
 		path_unr = i.unresolvedPath()
 		if '%root%' not in path_unr:
 			path_fix = path_unr.replace('//','/').split('/',3)[-1]
-			print 'replace for: ' + str(i) + 'with: ' + '%root%'+'/' + path_fix
+			print 'replace for: ' + str(i) + ' with: ' + '%root%'+'/' + path_fix
 			i.replaceWith('%root%'+'/'+path_fix)
 
 def replace_location(location_path, all_scene_refs, shot_filename):
@@ -383,7 +392,7 @@ def replace_location(location_path, all_scene_refs, shot_filename):
 		for ref in all_scene_refs:
 			ref_path = str(ref.path)
 			ref_namespace = str(ref.namespace)
-			if [True for i in exclude_list if i in ref_path or i in ref_namespace]:
+			if [True for i in exclude_list if i in ref_path.split('/') or i in ref_namespace.split('_')]:
 				print 'LEAVE REF:', str(ref)
 			else:
 				print 'REMOVE REF:', str(ref)
@@ -391,11 +400,11 @@ def replace_location(location_path, all_scene_refs, shot_filename):
 		for loc in location_path:
 			print loc
 			#shot_filename_no_ext = shot_filename.split('.')[0]
-			loc_namespace = location_path.rsplit('\\',1)[1].split('.')[0]
-			print 'LOCATION', loc, shot_filename_no_ext
+			loc_namespace = loc.rsplit('\\',1)[1].split('.')[0]
+			print 'LOCATION', loc
 			pm.createReference(loc, namespace=loc_namespace)
-		else:
-			print 'NO LOCATION PROVIDED'
+	else:
+		print 'NO LOCATION PROVIDED'
 
 def getCameras():
 # Get all cameras first
