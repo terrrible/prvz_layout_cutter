@@ -77,17 +77,8 @@ def alShotChopOn():
 
 def debug(args):
 	print 'DEBUG func'
-	all_scene_refs = [i for i in pm.listReferences() if 'back' in i.path]
-	print all_scene_refs
-	fix_ref_paths(all_scene_refs)
-	exclude_list = get_exclude_asset_list()
-	for ref in all_scene_refs:
-		ref_path = str(ref.path)
-		ref_namespace = str(ref.namespace)
-		if [True for i in exclude_list if i in ref_path.split('/') or i in ref_namespace.split('_')]:
-			print 'LEAVE REF:', str(ref)
-		else:
-			print 'REMOVE REF:', str(ref)
+	excl_shots = service_shots_status()
+	filter_excluded_shots(excl_shots)
 
 def create_folder(dst_path):
 	if not os.path.exists(dst_path):
@@ -160,27 +151,32 @@ def service_shots_status():
 		opt_id = 'id'
 	else:
 		opt_id = ' '
+	print '@@@ service_shots_status: ', [opt_sh0001, opt_id]
 	return [opt_sh0001, opt_id]
 
-def set_step1(checkBoxOpt):
-	#get excluded shots
+def filter_excluded_shots():
 	exclude_shots = service_shots_status()
 
 	#remove imageplanes from "ep" shots
-	shots = cmds.ls(type="shot")
+	shots = pm.ls(type='shot')
 	print 'DEBUG shots', shots
 	for s in shots[:]:
 		for e in exclude_shots:
-			if e not in s:
+			if e not in s.name():
+				print 'leave shot: ', s.name()
 				pass
 			else:
 				shots.remove(s)
 				print 'remove: ', s
-	#print 'DEBUG shots', shots
-	#for i in shots:
-		#result = 'OK'
+	return shots
 
-        #check shots sequence coherence
+def set_step1(checkBoxOpt):
+	#get excluded shots
+	shots = filter_excluded_shots()
+	print '@@@ filtered shots: ', shots
+	result_list = []
+	for i in shots:
+		#check shots sequence coherence
 		cur_ind = shots.index(i)
 		if cur_ind > 0:
 		#if cur_ind > 0 and opt_id not in i or opt_sh0001 not in i:
@@ -190,30 +186,36 @@ def set_step1(checkBoxOpt):
 			#print 'DEBUG i8', i[8:]
 			#print 'DEBUG i8-1', shots[prw_ind][8:]
 			if int(i[8:]) - int(shots[prw_ind][8:]) != 1:
-				result = cmds.promptDialog(
-						title='Naming Error',
-						message='Shots: '+ shots[prw_ind] + ' and ' + i,
-						button=['OK', 'Cancel'],
-						defaultButton='OK',
-						cancelButton='Cancel',
-						dismissString='Cancel')
+				result_list.append(shots[prw_ind] + ' and ' + i)
 
-		if result == 'OK':
+	result_str = ''.join([i+'\n' for i in result_list])
+	res = ''
+	if result_str:
+		print '@@@ result_str: ', result_str
+		check_win = cmds.window('')
+		cmds.paneLayout(configuration='single')
+		cmds.scrollField(editable=False, wordWrap=True, text=result_str)
+		cmds.showWindow()
+		res = cmds.confirmDialog( title='Confirm', message='Are you sure?', button=['Yes','No'], defaultButton='Yes', cancelButton='No', dismissString='No', parent=check_win)
+		if res == 'No':
+			pm.deleteUI(check_win)
 
+	if res == 'Yes' or not result_str:
+		for i in shots:
 			ip = cmds.connectionInfo(i + '.clip', sourceFromDestination = True)
 			if ip:
 				ipp = ip.split('.')[0].split('>')[1]
 				if 'id' not in i:
-					print 'shot:', i, 'imagePlane:', ipp
+					print 'shot:', i, 'removing imagePlane:', ipp
 					cmds.delete(ipp)
-#replace paths in imageplanes
-	if result == 'OK':
+		#replace paths in imageplanes
 		ips = cmds.ls(type='imagePlane')
 		for i in ips:
 			p1 = cmds.getAttr(i + '.imageName')
 			p2 = p1.replace('omega/'+PRJ_NAME, '%root%')
-			cmds.setAttr(i + '.imageName', p2, type='string')
-			print i, p1, '-->', p2, '\n'
+			p3 = p2[p2.find('%root%'):]
+			cmds.setAttr(i + '.imageName', p3, type='string')
+			print i, p1, '-->', p3, '\n'
 	 
 		cams =  getCameras()
 		for i in cams:
@@ -228,7 +230,7 @@ def set_step2(args):
 			print 'unload', str(ref)
 			ref.remove()
 
-	fix_ref_paths(all_scene_refs)
+	fix_ref_paths()
 	
 	#remove shots, cameras and audio
 	shots = pm.ls(type="shot")
@@ -251,6 +253,8 @@ def fix_shot_naming(shot):
 		shot_new_name = str(shot).split('_')[1]
 		print 'Renaming shot %s' %shot_new_name
 		return shot.rename(shot_new_name)
+	else:
+		return shot
 
 def start_cutting(progressControl):
 	#prefix = str(pm.textFieldButtonGrp('NAMEFIELD', q=1, text=1))
@@ -286,9 +290,8 @@ def start_cutting(progressControl):
 				pm.delete(i)
 
 			#fix ref paths, remove all refs except exclude list and load location ref
-			all_scene_refs = pm.listReferences()
-			fix_ref_paths(all_scene_refs)
-			replace_location(location_path, all_scene_refs, shot_paths['shot_filename'])
+			fix_ref_paths()
+			replace_location(location_path, shot_paths['shot_filename'])
 
 			# Get camera for this shot
 			print '@DEBUG start Get camera for this shot'
@@ -378,16 +381,21 @@ def create_imagePlane(cam, shot, shot_cut_filename_path_unr):
 	pm.disconnectAttr(shot+'.clip')
 	return im_plane
 
-def fix_ref_paths(all_scene_refs):
+def fix_ref_paths():
+	all_scene_refs = pm.listReferences()
 	for i in all_scene_refs:
 		path_unr = i.unresolvedPath()
 		if '%root%' not in path_unr:
 			path_fix = path_unr.replace('//','/').split('/',3)[-1]
 			print 'replace for: ' + str(i) + ' with: ' + '%root%'+'/' + path_fix
 			i.replaceWith('%root%'+'/'+path_fix)
+		else:
+			'check namespace'
+			fix_ref_namespace(i)
 
-def replace_location(location_path, all_scene_refs, shot_filename):
+def replace_location(location_path, shot_filename):
 	print '@DEBUG start replace_location'
+	all_scene_refs = pm.listReferences()
 	if location_path:
 		location_path = location_path.split('\n')
 		exclude_list = get_exclude_asset_list()
@@ -407,6 +415,15 @@ def replace_location(location_path, all_scene_refs, shot_filename):
 			pm.createReference(loc, namespace=loc_namespace)
 	else:
 		print 'NO LOCATION PROVIDED'
+
+def fix_ref_namespace(ref):
+	namespace_wo_digits = ''.join([s for s in ref.namespace if not s.isdigit()])
+	ref_filename_wo_ext = ref.unresolvedPath().rsplit('/', 1)[1].split('.')[0]
+	if namespace_wo_digits != ref_filename_wo_ext:
+		print 'error namespace: ', ref, ref.namespace
+		print 'path_unr: ', ref.unresolvedPath()
+		print 'ref_filename_wo_ext: ', ref_filename_wo_ext
+		cmds.file(ref.unresolvedPath(), edit = True, namespace = ref_filename_wo_ext)
 
 def getCameras():
 # Get all cameras first
