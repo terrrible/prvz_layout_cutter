@@ -65,7 +65,7 @@ def alShotChopOn():
 	progressControl = cmds.progressBar('progress_control',width=600, visible=False)
 	cmds.scrollField('LOC', editable=True, wordWrap=False, w=600, h=60, text=get_loc())
 	cmds.checkBox('copy_flag',label='Copy to 2_prod', value=True)
-	cmds.checkBox('copyftp_flag',label='Copy to FTP', value=False)
+	cmds.checkBox('copyftp_flag',label='Copy to FTP', value=True)
 
 	cmds.textFieldButtonGrp('NAMEFIELD', text="cutscene", bc=lambda *args: start_cutting(progressControl), buttonLabel="CUT",
 						  label="Cut Scenes Name Prefix:")
@@ -170,37 +170,58 @@ def filter_excluded_shots():
 				print 'remove: ', s
 	return shots
 
+def raise_warn_dlg(result_list):
+	print '@@@ raise_warn_dlg: ', result_list
+	if cmds.window('check_win', exists=True) == True:
+		cmds.deleteUI('check_win')
+	result_str = ''.join([i+'\n' for i in result_list])
+	check_win = cmds.window('check_win')
+	cmds.paneLayout(configuration='single')
+	cmds.scrollField(editable=False, wordWrap=True, text=result_str)
+	cmds.showWindow()
+	res = cmds.confirmDialog( title='Confirm', message='Are you sure?', button=['Yes','No'], defaultButton='Yes', cancelButton='No', dismissString='No', parent=check_win)
+	return res
+
 def set_step1(checkBoxOpt):
 	#get excluded shots
 	shots = filter_excluded_shots()
-	print '@@@ filtered shots: ', shots
 	result_list = []
-	for i in shots:
-		#check shots sequence coherence
-		cur_ind = shots.index(i)
+	stop_step1 = False
+
+	#check equal naming for shot name and Shot Name attribute
+	for shot in shots:
+		if shot.name() != shot.getShotName():
+			result_list.append(shot.name() + ' has shotName: ' + shot.getShotName())
+	if len(result_list) > 0:
+		res = raise_warn_dlg(result_list)
+		if res == 'Yes':
+			result_list = []
+		elif res == 'No':
+			return 'stop step1'
+		cmds.deleteUI('check_win')
+
+	#check shots sequence coherence
+	for shot in shots:
+		print '@ #check shots sequence coherence'
+		cur_ind = shots.index(shot)
 		if cur_ind > 0:
-		#if cur_ind > 0 and opt_id not in i or opt_sh0001 not in i:
+		#if cur_ind > 0 and opt_id not in shot or opt_sh0001 not in shot:
+			shot = fix_shot_naming(shot)
 			print 'DEBUG cur_ind', cur_ind
-			print 'DEBUG shot:', i
-			prw_ind = shots.index(i) - 1
-			#print 'DEBUG i8', i[8:]
+			print 'DEBUG shot:', shot
+			prw_ind = shots.index(shot) - 1
+			curr_shot = int(shot[2:])
+			prev_shot = fix_shot_naming(shots[prw_ind])
+			#print 'DEBUG i8', shot[8:]
 			#print 'DEBUG i8-1', shots[prw_ind][8:]
-			if int(i[8:]) - int(shots[prw_ind][8:]) != 1:
-				result_list.append(shots[prw_ind] + ' and ' + i)
+			if curr_shot - int(prev_shot[2:]) != 1:
+				result_list.append(prev_shot + ' and ' + shot)
 
-	result_str = ''.join([i+'\n' for i in result_list])
-	res = ''
-	if result_str:
-		print '@@@ result_str: ', result_str
-		check_win = cmds.window('')
-		cmds.paneLayout(configuration='single')
-		cmds.scrollField(editable=False, wordWrap=True, text=result_str)
-		cmds.showWindow()
-		res = cmds.confirmDialog( title='Confirm', message='Are you sure?', button=['Yes','No'], defaultButton='Yes', cancelButton='No', dismissString='No', parent=check_win)
-		if res == 'No':
-			pm.deleteUI(check_win)
-
-	if res == 'Yes' or not result_str:
+	if result_list:
+		res = raise_warn_dlg(result_list)
+	if res == 'No':
+		pass
+	elif res == 'Yes' or not result_list:
 		for i in shots:
 			ip = cmds.connectionInfo(i + '.clip', sourceFromDestination = True)
 			if ip:
@@ -237,6 +258,10 @@ def set_step2(args):
 	cams =  getCameras()
 	audio = pm.ls(type='audio')
 	for i in shots+cams+audio:
+		try:
+			i.setLock(False)
+		except:
+			pass
 		pm.delete(i)
 		print 'delete node: %s' %i
 
@@ -244,11 +269,8 @@ def get_exclude_asset_list():
 	exclude_list = pm.scrollField('EX', q=1, text=True)
 	return exclude_list.split('\n')
 
-#def alRunChop(progressControl):
-	#prefix = str(pm.textFieldButtonGrp('NAMEFIELD', q=1, text=1))
-	#start_cutting(prefix, progressControl)
-
 def fix_shot_naming(shot):
+	shot.setLock(False)
 	if '_' in str(shot):
 		shot_new_name = str(shot).split('_')[1]
 		print 'Renaming shot %s' %shot_new_name
@@ -257,7 +279,6 @@ def fix_shot_naming(shot):
 		return shot
 
 def start_cutting(progressControl):
-	#prefix = str(pm.textFieldButtonGrp('NAMEFIELD', q=1, text=1))
 # Kill all jobs
 	cmds.scriptJob(ka=True)
 
